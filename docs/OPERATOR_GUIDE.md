@@ -30,6 +30,7 @@ SimHire 是一个 AI 面试训练平台，目标是从最小可用 Web 面试系
 3. 要求 agent 再读当前阶段起始文档，例如 `docs/phases/PHASE_2_REALTIME_START.md`。
 4. 明确这次只做哪个 subagent 任务。
 5. 要求 agent 完成后说明改动文件、验证命令、验证结果和已知限制。
+6. 完成一个阶段后，要求agent写下一个阶段的开始文档
 
 Phase 2 的任务可以按 R0、R1、R2、R3、R4 依次派发，具体见 `docs/phases/PHASE_2_REALTIME_START.md`。
 
