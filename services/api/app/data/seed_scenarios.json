@@ -1,0 +1,42 @@
+[
+  {
+    "id": "campus_general",
+    "name": "通用校招面试",
+    "description": "适合应届生综合素质训练，覆盖自我介绍、项目经历、职业动机和压力追问。",
+    "category": "campus",
+    "defaultQuestionCount": 4,
+    "difficulty": "medium",
+    "rubricId": "default_v1",
+    "openingPrompt": "请先做一个 1 分钟自我介绍。"
+  },
+  {
+    "id": "civil_service_structured",
+    "name": "公考结构化面试",
+    "description": "训练综合分析、组织协调、应急应变和人际沟通。",
+    "category": "civil_service",
+    "defaultQuestionCount": 3,
+    "difficulty": "medium",
+    "rubricId": "civil_service_v1",
+    "openingPrompt": "请谈谈你对青年就业压力的看法。"
+  },
+  {
+    "id": "technical_intern",
+    "name": "技术岗实习面试",
+    "description": "适合技术实习岗位，关注项目深度、基础知识和问题拆解能力。",
+    "category": "technical",
+    "defaultQuestionCount": 4,
+    "difficulty": "medium",
+    "rubricId": "technical_v1",
+    "openingPrompt": "请介绍一个你最熟悉的技术项目。"
+  },
+  {
+    "id": "postgraduate_reexam",
+    "name": "研究生复试",
+    "description": "训练学术动机、专业基础、科研潜力和英文问答。",
+    "category": "postgraduate",
+    "defaultQuestionCount": 4,
+    "difficulty": "medium",
+    "rubricId": "postgraduate_v1",
+    "openingPrompt": "请介绍你的本科背景和报考本专业的原因。"
+  }
+]
