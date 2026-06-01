@@ -30,6 +30,7 @@ SimHire 是一个 AI 面试训练平台，目标是从最小可用 Web 面试系
 3. 要求 agent 再读当前阶段起始文档，例如 `docs/phases/PHASE_2_REALTIME_START.md`。
 4. 明确这次只做哪个 subagent 任务。
 5. 要求 agent 完成后说明改动文件、验证命令、验证结果和已知限制。
+6. 完成一个阶段后，要求agent写下一个阶段的开始文档
 
 Phase 2 的任务可以按 R0、R1、R2、R3、R4 依次派发，具体见 `docs/phases/PHASE_2_REALTIME_START.md`。
 
@@ -51,3 +52,6 @@ Phase 2 的任务可以按 R0、R1、R2、R3、R4 依次派发，具体见 `docs
 ```text
 你正在参与 SimHire AI 面试平台开发。请先阅读 docs/AI_INTERVIEW_PLATFORM_DEV_DOC.md，再阅读本次任务指定的阶段起始文档。不要读取或修改 docs/OPERATOR_GUIDE.md，除非我在当前对话中明确要求。请只完成本次任务范围，完成后说明改动文件、验证命令、验证结果和已知限制。
 ```
+## 6. AI使用
+
+项目创建和阶段1消耗了codex plus周额度的60%左右(如果没有合适的中转或者套餐推荐codexcn的30r/月的codex plus，可以用5.5而且应该比较稳定)。尽量一次做完一个阶段，发现额度不够可能做不完记得让ai新建一个文件写进度说明，和做完的工作一起提交。再发到群里换人跑
