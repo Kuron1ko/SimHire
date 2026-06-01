@@ -53,7 +53,7 @@ Invoke-RestMethod http://127.0.0.1:8000/api/health
 http://127.0.0.1:5173
 ```
 
-## 4. 当前 API 与 AI 调用方式
+## 4. 当前 API 与 AI 调用路径
 
 前端只调用本项目后端，不直接调用 OpenAI 或其他模型服务。
 
@@ -91,11 +91,37 @@ LLM_MODEL=
 
 也就是说，当前只设置 `LLM_API_KEY` 不会调用 OpenAI。
 
+当前真实调用路径是：
+
+```text
+Browser
+  -> apps/web/src/services/apiClient.ts
+  -> FastAPI /api/*
+  -> InterviewOrchestrator / EvaluationService
+  -> QuestionAgent / DeterministicScoringEngine
+  -> mock 题库与规则评分
+```
+
+未来接入真实模型后的目标路径是：
+
+```text
+Browser
+  -> SimHire FastAPI backend
+  -> QuestionAgent / BehaviorOrchestrator / EvaluationService
+  -> LLMProvider
+  -> OpenAI-compatible API(base_url, api_key)
+```
+
 ## 5. 如果要接入 OpenAI-compatible API
 
 推荐由后端接入，前端不要保存或发送模型 key。
 
-建议新增环境变量：
+调用外部模型必须有两个核心参数：
+
+1. `base_url`：OpenAI-compatible 服务地址。
+2. `api_key`：服务端密钥。
+
+建议环境变量映射：
 
 ```text
 LLM_PROVIDER=openai
@@ -104,7 +130,7 @@ LLM_API_KEY=你的 key
 LLM_MODEL=gpt-4.1-mini
 ```
 
-如果使用中转或其他 OpenAI-compatible 服务，把 `LLM_BASE_URL` 改成对应地址即可。
+其中 `LLM_BASE_URL` 对应 provider 的 `base_url`，`LLM_API_KEY` 对应 provider 的 `api_key`。如果使用中转或其他 OpenAI-compatible 服务，把 `LLM_BASE_URL` 改成对应地址即可。
 
 建议代码结构：
 
@@ -117,7 +143,7 @@ services/api/app/providers/llm/
 
 接入原则：
 
-1. `openai_provider.py` 使用 `LLM_BASE_URL + LLM_API_KEY + LLM_MODEL` 调模型。
+1. `openai_provider.py` 使用 `base_url + api_key + model` 调模型。
 2. `QuestionAgent` 先通过 provider 生成首题、追问和下一题。
 3. 评价系统先保留规则评分，等提问链路稳定后再接入 LLM。
 4. 不要在 `interview_orchestrator.py` 或 `evaluation_service.py` 里直接写供应商 SDK 调用。

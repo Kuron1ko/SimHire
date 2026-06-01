@@ -63,7 +63,32 @@ SimHire 来自 `12.pptx` 中的 AI 面试模拟系统设想，目标是为在校
 2. 表情、口型、姿态与语音节奏同步。
 3. 摄像头输入、复盘时间线和多模态评价。
 
-## 3. 文档体系
+## 3. AI 调用路径原则
+
+当前仓库还没有真实调用外部 AI 模型。Phase 1 的提问和评价使用确定性 mock 与规则评分。
+
+后续接入真实模型时，必须遵守以下调用路径：
+
+```text
+Browser
+  -> apps/web/src/services/apiClient.ts
+  -> FastAPI /api/*
+  -> InterviewOrchestrator / EvaluationService / RealtimeInterviewService
+  -> QuestionAgent / BehaviorOrchestrator / EvaluationService
+  -> LLMProvider 或 RealtimeProvider
+  -> OpenAI-compatible API
+```
+
+原则：
+
+1. 前端永远只调用 SimHire 后端，不直接调用 OpenAI 或任何模型供应商。
+2. 模型 key 只存在后端环境变量或服务端密钥系统中，不能进入浏览器代码、前端 env 或生成产物。
+3. 所有真实模型 provider 必须至少支持两个核心参数：`base_url` 和 `api_key`。
+4. 项目环境变量命名为 `LLM_BASE_URL` 和 `LLM_API_KEY`；provider 内部可映射为 `base_url` 和 `api_key`。
+5. 真实 provider 失败、缺少 key 或网络不可用时，必须能回退到 mock provider 或给出可恢复错误，不能破坏 MVP 闭环。
+6. 不允许把供应商 SDK 调用直接散落在路由、orchestrator 或页面代码中；必须通过 provider adapter。
+
+## 4. 文档体系
 
 文档分为四类。
 
@@ -136,7 +161,7 @@ SimHire 来自 `12.pptx` 中的 AI 面试模拟系统设想，目标是为在校
 3. 调试者文档可以随着代码进度变化；它不需要像总览文档一样保持长期稳定。
 4. 该文档只写运行和调试方法，不写阶段规划和产品决策。
 
-## 4. Agent 工作制度
+## 5. Agent 工作制度
 
 每个 agent 开始工作前必须执行以下阅读顺序：
 
@@ -163,7 +188,7 @@ SimHire 来自 `12.pptx` 中的 AI 面试模拟系统设想，目标是为在校
 4. 哪些能力尚未覆盖。
 5. 是否需要后续 agent 继续处理。
 
-## 5. 如何判断当前进度
+## 6. 如何判断当前进度
 
 总览文档不随进度变化，因此 agent 不能从本文判断最新实现状态。
 
@@ -176,7 +201,7 @@ SimHire 来自 `12.pptx` 中的 AI 面试模拟系统设想，目标是为在校
 5. 如果阶段文档与代码不一致，以代码和测试为准，并在最终回复中建议更新阶段文档。
 6. 如果仍无法判断当前阶段，应向操作者询问，不要自行打开 human-owned 操作者文档。
 
-## 6. 当前阶段入口
+## 7. 当前阶段入口
 
 当前仓库已经完成 Phase 1 MVP。后续开发默认从 Phase 2 Realtime 开始。
 

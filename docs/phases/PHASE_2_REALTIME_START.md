@@ -89,6 +89,8 @@ Phase 2 不应破坏以上能力。
 2. 不把供应商 SDK 调用散落到业务服务。
 3. 保持 Phase 2 事件契约稳定。
 4. 没有真实 key 时，mock provider 仍可跑通。
+5. 真实 provider 必须由后端读取 `base_url` 和 `api_key`，环境变量建议映射为 `LLM_BASE_URL` 和 `LLM_API_KEY`。
+6. 前端不得保存、拼接或透传模型供应商 key。
 
 ## 5. 后端新增结构建议
 
@@ -121,6 +123,16 @@ services/api/app/
 4. `intervention_policy.py`：沉默追问、乱答提醒、兴趣打断、冷却和频率上限。
 5. `realtime_event_bus.py`：阶段内可先用内存队列，后续可替换 Redis pub/sub。
 6. `providers/realtime/*`：为后续 Realtime LLM 或服务端 ASR/TTS 预留 adapter。
+
+服务端实时 provider 的目标调用路径：
+
+```text
+RealtimeInterviewRoomPage
+  -> WebSocket /api/realtime/interviews/{sessionId}
+  -> realtime_interview_service.py
+  -> intervention_policy.py
+  -> realtime provider(base_url, api_key)
+```
 
 ## 6. 前端新增结构建议
 
@@ -267,6 +279,106 @@ type RealtimeServerEvent =
 
 ## 9. Subagent 拆分建议
 
+### Agent P0：OpenAI-compatible LLM Provider 基座
+
+定位：
+
+该任务用于把当前 mock AI 路径升级为可切换的 provider 架构。它可以在 R0 前执行，也可以在 Phase 2A 的 mock 实时链路稳定后执行。Phase 2 的即时性功能不应强依赖真实 key；没有 key 时必须继续使用 mock。
+
+负责：
+
+1. `services/api/app/core/config.py`
+2. `services/api/app/dependencies.py`
+3. `services/api/app/providers/llm/base.py`
+4. `services/api/app/providers/llm/mock_provider.py`
+5. `services/api/app/providers/llm/openai_provider.py`
+6. `services/api/app/services/question_agent.py`
+7. `services/api/app/tests/test_llm_provider.py`
+8. `services/api/app/tests/test_question_agent_provider.py`
+9. `services/api/.env.example`
+10. `docs/DEBUGGER_GUIDE.md`
+
+交付：
+
+1. 后端配置新增 `LLM_BASE_URL`，并保留 `LLM_PROVIDER`、`LLM_API_KEY`、`LLM_MODEL`。
+2. provider 内部显式使用 `base_url` 和 `api_key` 两个核心参数。
+3. `LLMProvider` 协议或抽象类，至少支持生成首题、追问、下一题所需的结构化结果。
+4. `MockLLMProvider` 保持当前确定性行为，作为默认路径。
+5. `OpenAICompatibleProvider` 支持 OpenAI-compatible chat/completions 或 responses 风格 API，具体接口以实现时选择的 SDK 或 HTTP 调用为准。
+6. `QuestionAgent` 通过 provider 获取问题；没有 key、provider 失败或 `LLM_PROVIDER=mock` 时，MVP 流程仍可跑通。
+7. 前端不新增任何模型 key 配置，不直接调用模型供应商。
+8. 测试覆盖 mock provider、配置选择、缺少 key 的行为、provider 输出结构校验和 fallback。
+9. `.env.example` 只写变量名和占位值，不写真实 key。
+10. 调试者文档同步说明真实 provider 的启动环境变量。
+
+验收标准：
+
+1. 默认不设置任何 LLM 环境变量时，现有 MVP 行为不变。
+2. `LLM_PROVIDER=mock` 时，后端测试通过。
+3. `LLM_PROVIDER=openai` 但缺少 `LLM_BASE_URL` 或 `LLM_API_KEY` 时，有明确错误或自动回退，不产生未捕获异常。
+4. `LLM_PROVIDER=openai` 且配置完整时，调用路径只发生在后端 provider 内。
+5. `python -m pytest -q` 和 `npm run build` 通过。
+
+### Agent P1：评价 LLM Provider 与结构化报告
+
+定位：
+
+该任务用于把评价系统从纯规则评分扩展为“规则评分 + LLM 结构化诊断”。它不阻塞 Phase 2A 的即时性体验；如果 Phase 2 只做实时互动，可以把 P1 延后到 Phase 3。
+
+负责：
+
+1. `services/api/app/services/evaluation_service.py`
+2. `services/api/app/domain/scoring.py`
+3. `services/api/app/providers/llm/base.py`
+4. `services/api/app/services/prompt_builder.py`
+5. `services/api/app/tests/test_evaluation_llm_provider.py`
+6. `docs/DEBUGGER_GUIDE.md`
+
+交付：
+
+1. 评价链路通过 P0 的 `LLMProvider` 获取结构化诊断、优势、风险和行动建议。
+2. 不能让 LLM 一次性生成完整大报告；能力线、心理线、逐题反馈、行动计划应拆成小结构，后端组装成 `EvaluationReport`。
+3. LLM 输出必须经过 Pydantic 校验；失败时回退到当前 `DeterministicScoringEngine`。
+4. 必须保留“手动输入回答导致心理线置 0”的 Phase 1 规则，LLM 不能覆盖该规则。
+5. 没有 `base_url/api_key` 或 provider 失败时，报告页仍能使用规则评分生成报告。
+6. 调试者文档同步说明当前评价是否使用真实 provider。
+
+验收标准：
+
+1. 默认 mock 配置下，现有评价报告行为不变。
+2. 手动输入回答时，心理线仍为 0 且报告标注原因。
+3. LLM 返回非法结构时，后端不会产生 500，而是回退或返回可恢复错误。
+4. 后端测试覆盖成功、fallback、非法输出和手动输入规则。
+
+### Agent P2：服务端 Realtime Provider 2B
+
+定位：
+
+该任务只在 Phase 2A 的浏览器事件流稳定后执行。它用于接入服务端 ASR/TTS 或 Realtime LLM，不是 Phase 2A 的前置条件。
+
+负责：
+
+1. `services/api/app/providers/realtime/base.py`
+2. `services/api/app/providers/realtime/mock_provider.py`
+3. `services/api/app/providers/realtime/openai_realtime_provider.py`
+4. `services/api/app/services/realtime_interview_service.py`
+5. `services/api/app/tests/test_realtime_provider.py`
+6. `docs/DEBUGGER_GUIDE.md`
+
+交付：
+
+1. Realtime provider 显式接收 `base_url` 和 `api_key`。
+2. 没有真实 key 时，实时房间继续使用 mock provider 或浏览器事件流策略。
+3. provider 不直接暴露供应商事件到前端；前端仍只接收本文档定义的 `RealtimeServerEvent`。
+4. WebSocket 断开、provider 超时或供应商错误时，用户可以回退到 Phase 1 回合式面试。
+5. 调试者文档同步实时 provider 的环境变量和运行限制。
+
+验收标准：
+
+1. `LLM_PROVIDER=mock` 或没有 key 时，Phase 2A 流程不受影响。
+2. provider 错误不会导致 WebSocket 未处理异常。
+3. 后端测试覆盖 mock provider、配置缺失、超时和事件格式转换。
+
 ### Agent R0：实时契约和状态设计
 
 负责：
@@ -358,6 +470,9 @@ Phase 2 完成时必须满足：
 6. 干预不会无限触发，有冷却和每题次数上限。
 7. 实时房间可以正常结束，并复用 Phase 1 评价报告链路。
 8. Phase 1 回合式面试仍可用。
+9. 如果执行了 Agent P0，则真实模型调用必须只经过后端 provider，并且 `base_url/api_key` 约定已在调试者文档中同步。
+10. 如果执行了 Agent P1，评价系统必须保留心理线置 0 规则和 deterministic fallback。
+11. 如果执行了 Agent P2，服务端 realtime provider 失败时必须可回退。
 
 ## 11. 回归命令
 
